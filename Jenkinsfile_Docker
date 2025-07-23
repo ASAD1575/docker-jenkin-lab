@@ -4,7 +4,7 @@ pipeline {
     environment {
         AWS_ACCOUNT_ID     = "375299695019"
         AWS_DEFAULT_REGION = "eu-north-1"
-        IMAGE_REPO_NAME    = "jenkins-pipeline"
+        IMAGE_REPO_NAME    = "ecs-fargate"
         IMAGE_TAG          = "latest"
         REPOSITORY_URI     = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}"
     }
