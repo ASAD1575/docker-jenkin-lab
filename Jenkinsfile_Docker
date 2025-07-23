@@ -6,13 +6,13 @@ pipeline {
         AWS_DEFAULT_REGION = "eu-north-1"
         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
         AWS_ACCESS_KEY_ID  = credentials('AWS_ACCESS_KEY_ID')
-        IMAGE_REPO_NAME    = "jenkins-pipeline"
+        IMAGE_REPO_NAME    = "ecs-fargate"
         IMAGE_TAG          = "latest"
         REPOSITORY_URI     = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}"
         CLUSTER_NAME       = "node-app-cluster"
         SERVICE_NAME       = "node-app-service"
     }
-
+     
     stages {
         stage('Terraform Init & Apply') {
             agent {
@@ -22,93 +22,15 @@ pipeline {
                 }
             }
             steps {
-                sh '''
-                    terraform init
-                    terraform apply -auto-approve
-                '''
-            }
-        }
-
-        stage('Get ECR Repository URI from Terraform') {
-            agent {
-                docker {
-                    image 'hashicorp/terraform:1.5.7'
-                    args '--entrypoint="" -u root:root'
-                }
-            }
-            steps {
                 script {
-                    def uri = sh(script: 'terraform output -raw ecr_repository_uri || echo ""', returnStdout: true).trim()
-                    if (uri) {
-                        env.REPOSITORY_URI = uri
-                        echo "ECR URI fetched from Terraform: ${env.REPOSITORY_URI}"
-                    } else {
-                        echo "Terraform output not found. Falling back to default: ${env.REPOSITORY_URI}"
-                    }
-                }
-            }
-        }
-
-        stage('Build & Push Docker Image') {
-            steps {
-                sh '''
-                    aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${REPOSITORY_URI}
-                    docker build -t ${IMAGE_REPO_NAME}:${IMAGE_TAG} .
-                    docker tag ${IMAGE_REPO_NAME}:${IMAGE_TAG} ${REPOSITORY_URI}:${IMAGE_TAG}
-                    docker push ${REPOSITORY_URI}:${IMAGE_TAG}
-                '''
-            }
-        }
-
-        stage('Terraform Init & Apply again') {
-            agent {
-                docker {
-                    image 'hashicorp/terraform:1.5.7'
-                    args '--entrypoint="" -u root:root'
-                }
-            }
-            steps {
-                sh '''
-                    terraform init
-                    terraform apply -auto-approve
-                '''
-            }
-        }
-
-        stage('Wait for ECS Service to be Stable') {
-            agent {
-                docker {
-                    image 'amazon/aws-cli:2.15.0'
-                    args '--entrypoint="" -u root:root'
-                }
-            }
-            steps {
-                sh "aws ecs wait services-stable --cluster ${CLUSTER_NAME} --services ${SERVICE_NAME} --region ${AWS_DEFAULT_REGION}"
-            }
-        }
-
-        stage('Output ALB DNS Name') {
-            steps {
-                agent {
-                    docker {
-                        image 'hashicorp/terraform:1.5.7'
-                        args '--entrypoint="" -u root:root'
-                        }
-                    }
-                script {
-                     sh '''
+                    sh '''
                         terraform init
-                        terraform apply -auto-approve
+                        terraform destroy -auto-approve
                     '''
-                    
-                    def albDns = sh(script: 'terraform output -raw alb_dns_name || echo ""', returnStdout: true).trim()
-                    if (albDns) {
-                        echo "ALB DNS Name: ${albDns}"
-                    } else {
-                        echo "No ALB DNS output found in Terraform."
                     }
+                
                 }
-            }
         }
+
     }
 }
