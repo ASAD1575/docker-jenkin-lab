@@ -14,7 +14,7 @@ pipeline {
     }
 
     stages {
-        stage('Terraform Init & Apply') {
+        stage('Terraform Init & Apply (Infrastructure)') {
             agent {
                 docker {
                     image 'hashicorp/terraform:1.5.7'
@@ -60,7 +60,7 @@ pipeline {
             }
         }
 
-        stage('Terraform Init & Apply again') {
+        stage('Terraform Apply (Update ECS Task)') {
             agent {
                 docker {
                     image 'hashicorp/terraform:1.5.7'
@@ -84,21 +84,6 @@ pipeline {
             }
             steps {
                 sh "aws ecs wait services-stable --cluster ${CLUSTER_NAME} --services ${SERVICE_NAME} --region ${AWS_DEFAULT_REGION}"
-            }
-        }
-        
-        stage('Terraform Init & Apply again') {
-            agent {
-                docker {
-                    image 'hashicorp/terraform:1.5.7'
-                    args '--entrypoint="" -u root:root'
-                }
-            }
-            steps {
-                sh '''
-                    terraform init
-                    terraform apply -auto-approve
-                '''
             }
         }
 
