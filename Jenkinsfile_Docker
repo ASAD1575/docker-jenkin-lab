@@ -16,6 +16,7 @@ pipeline {
             agent {
                 docker {
                     image 'hashicorp/terraform:1.5.7'
+                    args 'entrypoint="" -u root:root'
                 }
             }
             steps {
@@ -61,25 +62,14 @@ pipeline {
             }
         }
 
-        stage('Get ECS Task Public IP') {
+        stage('Output alb dns name') {
             steps {
                 script {
-                    def taskArn = sh(
-                        script: "aws ecs list-tasks --cluster ${CLUSTER_NAME} --service-name ${SERVICE_NAME} --query 'taskArns[0]' --output text --region ${AWS_DEFAULT_REGION}",
+                    def albDnsName = sh(
+                        script: "terraform output -raw alb_dns_name",
                         returnStdout: true
                     ).trim()
-
-                    def eni = sh(
-                        script: "aws ecs describe-tasks --cluster ${CLUSTER_NAME} --tasks ${taskArn} --query 'tasks[0].attachments[0].details[?name==\\`networkInterfaceId\\`].value' --output text --region ${AWS_DEFAULT_REGION}",
-                        returnStdout: true
-                    ).trim()
-
-                    def publicIp = sh(
-                        script: "aws ec2 describe-network-interfaces --network-interface-ids ${eni} --query 'NetworkInterfaces[0].Association.PublicIp' --output text --region ${AWS_DEFAULT_REGION}",
-                        returnStdout: true
-                    ).trim()
-
-                    echo "Your ECS task is accessible at: http://${publicIp}:8080"
+                    echo "ALB DNS Name: ${albDnsName}"
                 }
             }
         }
