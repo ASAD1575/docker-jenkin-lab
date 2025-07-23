@@ -17,10 +17,10 @@ pipeline {
                 script {
                     sh '''
                         curl -LO https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
-                        unzip terraform_1.5.7_linux_amd64.zip
+                        unzip terraform_1.5.7_linux_amd64.zip -y
                         chmod +x terraform
-                        mv terraform ./terraform-bin
-                        export PATH=$PATH:$PWD
+                        mv terraform ./terraform-bin -y
+                        export PATH=$PATH:$PWD -y
                         ./terraform -version
                     '''
                     }
