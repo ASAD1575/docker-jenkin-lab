@@ -86,21 +86,25 @@ pipeline {
                 sh "aws ecs wait services-stable --cluster ${CLUSTER_NAME} --services ${SERVICE_NAME} --region ${AWS_DEFAULT_REGION}"
             }
         }
+        
+        stage('Terraform Init & Apply again') {
+            agent {
+                docker {
+                    image 'hashicorp/terraform:1.5.7'
+                    args '--entrypoint="" -u root:root'
+                }
+            }
+            steps {
+                sh '''
+                    terraform init
+                    terraform apply -auto-approve
+                '''
+            }
+        }
 
         stage('Output ALB DNS Name') {
             steps {
-                agent {
-                    docker {
-                        image 'hashicorp/terraform:1.5.7'
-                        args '--entrypoint="" -u root:root'
-                        }
-                    }
                 script {
-                     sh '''
-                        terraform init
-                        terraform apply -auto-approve
-                    '''
-                    
                     def albDns = sh(script: 'terraform output -raw alb_dns_name || echo ""', returnStdout: true).trim()
                     if (albDns) {
                         echo "ALB DNS Name: ${albDns}"
