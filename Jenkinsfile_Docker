@@ -7,50 +7,23 @@ pipeline {
         IMAGE_REPO_NAME    = "ecs-fargate"
         IMAGE_TAG          = "latest"
         REPOSITORY_URI     = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}"
+        CLUSTER_NAME       = "node-app-cluster"    // must match your Terraform ECS cluster name
+        SERVICE_NAME       = "node-app-service"    // must match your Terraform ECS service name
     }
 
     stages {
-        stage('Install Terraform') {
-            steps {
-                script {
-                    sh "sudo curl -LO https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip" && "unzip terraform_1.5.7_linux_amd64.zip" &&
-                    "sudo mv terraform /usr/local/bin/" && "terraform -version"
-                }
-            }
-        }
-
         stage('Terraform Init') {
             steps {
-                script {
-                    sh "terraform init"
-                }
-            }
-        }
-        
-        stage('Terraform Plan') {
-            steps {
-                script {
-                    sh "terraform plan"
-                }
-            }
-        }
-
-        stage('Terraform Validate') {
-            steps {
-                script {
-                    sh "terraform validate"
-                }
+                sh 'terraform init'
             }
         }
 
         stage('Terraform Apply') {
             steps {
-                script {
-                    sh "terraform apply -auto-approve"
-                }
+                sh 'terraform apply -auto-approve'
             }
         }
-        
+
         stage('Get ECR Repository URI from Terraform') {
             steps {
                 script {
@@ -58,49 +31,67 @@ pipeline {
                         script: "terraform output -raw ecr_repository_uri",
                         returnStdout: true
                     ).trim()
-                echo "ECR URI: ${env.REPOSITORY_URI}"
+                    echo "ECR URI: ${env.REPOSITORY_URI}"
                 }
             }
         }
 
-
-        stage('Logging into AWS ECR') {
+        stage('Login to ECR') {
             steps {
-                script {
-                    sh "aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${REPOSITORY_URI}"
-                }
+                sh 'aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${REPOSITORY_URI}'
             }
         }
 
-        stage('Cloning Git') {
+        stage('Clone Git') {
             steps {
                 checkout([
                     $class: 'GitSCM',
                     branches: [[name: '*/main']],
                     userRemoteConfigs: [[
-                        credentialsId: '', // Add GitHub credential ID if private repo
+                        credentialsId: '',
                         url: 'https://github.com/ASAD1575/docker-jenkin-lab.git'
                     ]]
                 ])
             }
         }
 
-        stage('Building Docker Image') {
+        stage('Build & Push Docker Image') {
             steps {
-                script {
-                    sh "docker build -t ${IMAGE_REPO_NAME}:${IMAGE_TAG} ."
-                }
+                sh '''
+                    docker build -t ${IMAGE_REPO_NAME}:${IMAGE_TAG} .
+                    docker tag ${IMAGE_REPO_NAME}:${IMAGE_TAG} ${REPOSITORY_URI}:${IMAGE_TAG}
+                    docker push ${REPOSITORY_URI}:${IMAGE_TAG}
+                '''
             }
         }
 
-        stage('Pushing to ECR') {
+        stage('Wait for ECS Service to be Stable') {
+            steps {
+                sh 'aws ecs wait services-stable --cluster ${CLUSTER_NAME} --services ${SERVICE_NAME} --region ${AWS_DEFAULT_REGION}'
+            }
+        }
+
+        stage('Get ECS Task Public IP') {
             steps {
                 script {
-                    sh "docker tag ${IMAGE_REPO_NAME}:${IMAGE_TAG} ${REPOSITORY_URI}:${IMAGE_TAG}"
-                    sh "docker push ${REPOSITORY_URI}:${IMAGE_TAG}"
+                    def taskArn = sh(
+                        script: "aws ecs list-tasks --cluster ${CLUSTER_NAME} --service-name ${SERVICE_NAME} --query 'taskArns[0]' --output text --region ${AWS_DEFAULT_REGION}",
+                        returnStdout: true
+                    ).trim()
+                    
+                    def eni = sh(
+                        script: "aws ecs describe-tasks --cluster ${CLUSTER_NAME} --tasks ${taskArn} --query 'tasks[0].attachments[0].details[?name==\\`networkInterfaceId\\`].value' --output text --region ${AWS_DEFAULT_REGION}",
+                        returnStdout: true
+                    ).trim()
+                    
+                    def publicIp = sh(
+                        script: "aws ec2 describe-network-interfaces --network-interface-ids ${eni} --query 'NetworkInterfaces[0].Association.PublicIp' --output text --region ${AWS_DEFAULT_REGION}",
+                        returnStdout: true
+                    ).trim()
+                    
+                    echo "Your ECS task is accessible at: http://${publicIp}:8080"
                 }
             }
         }
-        
     }
 }
