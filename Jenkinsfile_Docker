@@ -10,18 +10,23 @@ pipeline {
         CLUSTER_NAME       = "node-app-cluster"
         SERVICE_NAME       = "node-app-service"
     }
-
+     
     stages {
-        stage('Terraform Init & Apply') {
-            agent {
-                docker {
-                    image 'hashicorp/terraform:1.5.7'
-                    args '--entrypoint="" -u root:root -v $PWD:/workspace'
+        stage('Install Terraform') {
+            steps {
+                script {
+                sh '''
+                    curl -LO https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
+                    unzip terraform_1.5.7_linux_amd64.zip -y
+                    sudo mv terraform /usr/local/bin/
+                '''
                 }
             }
+        }
+
+        stage('Initialize Terraform') {
             steps {
                 sh '''
-                    cd /workspace
                     terraform init
                     terraform apply -auto-approve
                 '''
