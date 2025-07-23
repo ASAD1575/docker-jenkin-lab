@@ -25,17 +25,11 @@ pipeline {
                 script {
                     sh '''
                         terraform init
-                        terraform apply -auto-approve
+                        terraform destroy -auto-approve
                     '''
                     }
                 
                 }
-        }
-
-        stage('Terraform destroy') {
-            steps {
-                sh "terraform destroy -auto-approve"
-            }
         }
     }
 }
