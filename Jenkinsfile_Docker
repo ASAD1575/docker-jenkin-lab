@@ -25,11 +25,59 @@ pipeline {
                 script {
                     sh '''
                         terraform init
-                        terraform destroy -auto-approve
+                        terraform apply -auto-approve
                     '''
                     }
                 
                 }
+        }
+
+        stage('Get ECR Repository URI from Terraform') {
+            steps {
+                sh '''
+                    terraform output -raw ecr_repository_uri > ecr_uri.txt
+                '''
+                script {
+                    env.REPOSITORY_URI = readFile('ecr_uri.txt').trim()
+                    echo "ECR URI: ${env.REPOSITORY_URI}"
+                }
+            }
+        }
+
+        stage('Build & Push Docker Image') {
+            agent {
+                docker {
+                    image 'amazon/aws-cli:2.15.0'
+                    args '--entrypoint="" -u root:root -v /var/run/docker.sock:/var/run/docker.sock -v $PWD:/workspace'
+                }
+            }
+            steps {
+                sh '''
+                    cd /workspace
+                    aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${REPOSITORY_URI}
+                    docker build -t ${IMAGE_REPO_NAME}:${IMAGE_TAG} .
+                    docker tag ${IMAGE_REPO_NAME}:${IMAGE_TAG} ${REPOSITORY_URI}:${IMAGE_TAG}
+                    docker push ${REPOSITORY_URI}:${IMAGE_TAG}
+                '''
+            }
+        }
+
+        stage('Wait for ECS Service to be Stable') {
+            steps {
+                sh "aws ecs wait services-stable --cluster ${CLUSTER_NAME} --services ${SERVICE_NAME} --region ${AWS_DEFAULT_REGION}"
+            }
+        }
+
+        stage('Output ALB DNS Name') {
+            steps {
+                sh '''
+                    terraform output -raw alb_dns_name > alb_dns.txt
+                '''
+                script {
+                    def albDnsName = readFile('alb_dns.txt').trim()
+                    echo "ALB DNS Name: ${albDnsName}"
+                }
+            }
         }
     }
 }
