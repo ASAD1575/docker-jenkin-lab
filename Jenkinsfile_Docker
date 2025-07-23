@@ -6,7 +6,7 @@ pipeline {
         AWS_DEFAULT_REGION = "eu-north-1"
         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
         AWS_ACCESS_KEY_ID  = credentials('AWS_ACCESS_KEY_ID')
-        IMAGE_REPO_NAME    = "ecs-fargate"
+        IMAGE_REPO_NAME    = "jenkins-pipeline"
         IMAGE_TAG          = "latest"
         REPOSITORY_URI     = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}"
         CLUSTER_NAME       = "node-app-cluster"
