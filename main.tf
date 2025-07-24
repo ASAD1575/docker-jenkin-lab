@@ -5,13 +5,13 @@ terraform {
         version = "~> 3.0"
         }
     }
-    backend "s3" {
-       bucket         = "myterraformstatebucket1575"
-       key            = "terraform/state"
-       region         = "eu-north-1"
-       dynamodb_table = "terraform-locks"
-      
-    }
+    # backend "s3" {
+      # bucket         = "myterraformstatebucket1575"
+      # key            = "terraform/state"
+      # region         = "eu-north-1"
+      # dynamodb_table = "terraform-locks"
+      #
+    #}
 }
 
 provider "aws" {
