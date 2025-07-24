@@ -42,7 +42,7 @@ app.get('/', (req, res) => {
           margin-top: 20px;
           padding: 10px 20px;
           background-color: #ff9800;
-          color: white;
+          color: red;
           border: none;
           border-radius: 5px;
           cursor: pointer;
